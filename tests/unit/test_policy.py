@@ -9,7 +9,7 @@ from travel_agent.policy.loader import load_policy
 
 @pytest.fixture
 def policy():
-    return load_policy(Path("config/policy.example.yaml"))
+    return load_policy(Path("config/policy.yaml"))
 
 
 def test_compliant_trip_passes(policy):

@@ -1,4 +1,4 @@
 app_name: AI Travel Agent
 environment: development
 simulation_mode: true
-policy_path: config/policy.example.yaml
+policy_path: config/policy.yaml

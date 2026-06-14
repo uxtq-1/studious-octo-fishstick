@@ -6,7 +6,6 @@ build-backend = "hatchling.build"
 name = "travel-agent"
 version = "0.1.0"
 description = "Demonstration AI-assisted corporate travel planning application"
-readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 dependencies = [

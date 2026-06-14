@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     app_name: str = "AI Travel Agent"
     environment: str = "development"
     simulation_mode: bool = True
-    policy_path: Path = Path("config/policy.example.yaml")
+    policy_path: Path = Path("config/policy.yaml")
 
     model_config = SettingsConfigDict(env_prefix="TRAVEL_AGENT_", env_file=".env")
 
