@@ -1,5 +1,6 @@
 """Identity, role, tenant, and ownership authorization primitives."""
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated
@@ -22,6 +23,100 @@ class Role(StrEnum):
 
 
 PLATFORM_ROLES = frozenset({Role.PLATFORM_OWNER, Role.PLATFORM_ADMIN, Role.SECURITY_OPS_ADMIN})
+TENANT_ROLES = frozenset(
+    {
+        Role.TENANT_OWNER,
+        Role.TENANT_STAFF,
+        Role.FINANCE_BILLING,
+        Role.SUPPORT_L2,
+        Role.SUPPORT_L3,
+        Role.AUDITOR,
+    }
+)
+
+
+class Permission(StrEnum):
+    BOOKING_READ = "booking:read"
+    BOOKING_WRITE = "booking:write"
+    BOOKING_CANCEL = "booking:cancel"
+    REFUND_REQUEST = "refund:request"
+    REFUND_APPROVE = "refund:approve"
+    PAYMENT_READ = "payment:read"
+    SUPPORT_READ = "support:read"
+    SUPPORT_WRITE = "support:write"
+    TENANT_EXPORT = "tenant:export"
+    AUDIT_READ = "audit:read"
+
+
+ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
+    Role.PLATFORM_OWNER: frozenset(Permission),
+    Role.PLATFORM_ADMIN: frozenset(Permission),
+    Role.SECURITY_OPS_ADMIN: frozenset({Permission.AUDIT_READ, Permission.SUPPORT_READ}),
+    Role.TENANT_OWNER: frozenset(
+        {
+            Permission.BOOKING_READ,
+            Permission.BOOKING_WRITE,
+            Permission.BOOKING_CANCEL,
+            Permission.REFUND_REQUEST,
+            Permission.REFUND_APPROVE,
+            Permission.PAYMENT_READ,
+            Permission.SUPPORT_READ,
+            Permission.SUPPORT_WRITE,
+            Permission.TENANT_EXPORT,
+            Permission.AUDIT_READ,
+        }
+    ),
+    Role.TENANT_STAFF: frozenset(
+        {
+            Permission.BOOKING_READ,
+            Permission.BOOKING_WRITE,
+            Permission.BOOKING_CANCEL,
+            Permission.REFUND_REQUEST,
+            Permission.SUPPORT_READ,
+            Permission.SUPPORT_WRITE,
+        }
+    ),
+    Role.SUPPORT_L1: frozenset({Permission.SUPPORT_READ, Permission.SUPPORT_WRITE}),
+    Role.SUPPORT_L2: frozenset(
+        {
+            Permission.BOOKING_READ,
+            Permission.REFUND_REQUEST,
+            Permission.SUPPORT_READ,
+            Permission.SUPPORT_WRITE,
+        }
+    ),
+    Role.SUPPORT_L3: frozenset(
+        {
+            Permission.BOOKING_READ,
+            Permission.BOOKING_CANCEL,
+            Permission.REFUND_REQUEST,
+            Permission.REFUND_APPROVE,
+            Permission.SUPPORT_READ,
+            Permission.SUPPORT_WRITE,
+        }
+    ),
+    Role.FINANCE_BILLING: frozenset(
+        {
+            Permission.BOOKING_READ,
+            Permission.REFUND_REQUEST,
+            Permission.REFUND_APPROVE,
+            Permission.PAYMENT_READ,
+        }
+    ),
+    Role.END_CONSUMER: frozenset(
+        {
+            Permission.BOOKING_READ,
+            Permission.BOOKING_WRITE,
+            Permission.BOOKING_CANCEL,
+            Permission.REFUND_REQUEST,
+            Permission.SUPPORT_READ,
+            Permission.SUPPORT_WRITE,
+        }
+    ),
+    Role.AUDITOR: frozenset(
+        {Permission.BOOKING_READ, Permission.PAYMENT_READ, Permission.AUDIT_READ}
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +164,7 @@ async def authenticated_principal(request: Request) -> Principal:
 CurrentPrincipal = Annotated[Principal, Depends(authenticated_principal)]
 
 
-def require_roles(*allowed_roles: Role):
+def require_roles(*allowed_roles: Role) -> Callable[[Principal], Awaitable[Principal]]:
     allowed = frozenset(allowed_roles)
 
     async def dependency(principal: CurrentPrincipal) -> Principal:
@@ -80,17 +175,29 @@ def require_roles(*allowed_roles: Role):
     return dependency
 
 
+def has_permission(principal: Principal, permission: Permission) -> bool:
+    return permission in ROLE_PERMISSIONS.get(principal.role, frozenset())
+
+
 def authorize_resource(
     principal: Principal,
     *,
     owner_user_id: str | None,
     tenant_id: str | None,
+    permission: Permission | None = None,
     admin_roles: frozenset[Role] = PLATFORM_ROLES,
 ) -> None:
+    if permission is not None and not has_permission(principal, permission):
+        raise _safe_auth_error(status.HTTP_403_FORBIDDEN, "Forbidden")
     if principal.role in admin_roles:
         return
     if owner_user_id and principal.user_id == owner_user_id:
         return
-    if tenant_id and principal.tenant_id and principal.tenant_id == tenant_id:
+    if (
+        principal.role in TENANT_ROLES
+        and tenant_id
+        and principal.tenant_id
+        and principal.tenant_id == tenant_id
+    ):
         return
     raise _safe_auth_error(status.HTTP_403_FORBIDDEN, "Forbidden")

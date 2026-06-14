@@ -52,6 +52,8 @@ class SecurityHeadersMiddleware:
                 headers["X-Content-Type-Options"] = "nosniff"
                 headers["X-Frame-Options"] = "DENY"
                 headers["X-Request-Id"] = request_id
+                if scope["path"].startswith("/api/"):
+                    headers["Cache-Control"] = "no-store"
                 if self.enable_hsts:
                     headers["Strict-Transport-Security"] = (
                         "max-age=31536000; includeSubDomains; preload"
