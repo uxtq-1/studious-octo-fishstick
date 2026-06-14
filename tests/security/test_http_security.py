@@ -67,6 +67,7 @@ def test_admin_role_can_access_admin_route():
         )
     assert response.status_code == 200
     assert response.json() == {"status": "authorized", "userId": "admin-1"}
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_oversized_content_length_is_rejected():

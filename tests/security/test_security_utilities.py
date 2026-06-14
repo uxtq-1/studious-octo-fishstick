@@ -1,12 +1,21 @@
 import hashlib
 import hmac
 import json
+from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 
 from travel_agent.security.audit import AuditEvent, RiskLevel, redact_metadata
+from travel_agent.security.payments import PaymentRecord, PaymentStatus
 from travel_agent.security.ssrf import UnsafeOutboundUrl, validate_outbound_url
-from travel_agent.security.webhooks import InvalidWebhook, verify_hmac_webhook
+from travel_agent.security.validation import SafeTextRequest, reject_sensitive_payment_fields
+from travel_agent.security.webhooks import (
+    InvalidWebhook,
+    claim_webhook_event,
+    verify_hmac_webhook,
+)
 
 
 def _resolver_with(address: str):
@@ -85,3 +94,54 @@ def test_audit_metadata_redacts_sensitive_fields():
         "token": "[REDACTED]",
         "providerReference": "safe",
     }
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "<script>alert(1)</script>",
+        "1 UNION SELECT password FROM users",
+        "$(curl https://example.test)",
+        "{{ config.items() }}",
+    ],
+)
+def test_suspicious_input_is_rejected(message):
+    with pytest.raises(ValidationError):
+        SafeTextRequest(message=message)
+
+
+def test_strict_request_rejects_unknown_fields():
+    with pytest.raises(ValidationError):
+        SafeTextRequest(message="A normal support request", unexpected="not allowed")
+
+
+def test_raw_card_fields_are_rejected():
+    with pytest.raises(ValueError, match="Sensitive payment data"):
+        reject_sensitive_payment_fields({"cardNumber": "4111111111111111"})
+
+
+def test_payment_record_accepts_only_tokenized_metadata():
+    now = datetime.now(UTC)
+    record = PaymentRecord(
+        payment_id="pay-1",
+        provider="hosted-provider",
+        provider_reference="provider-token-reference",
+        payment_status=PaymentStatus.PENDING,
+        amount=Decimal("125.50"),
+        currency="USD",
+        tenant_id="tenant-1",
+        booking_id="booking-1",
+        user_id="user-1",
+        created_at=now,
+        updated_at=now,
+    )
+    assert record.amount == Decimal("125.50")
+    with pytest.raises(ValidationError):
+        PaymentRecord(**record.model_dump(), cvv="123")
+
+
+def test_duplicate_webhook_event_is_rejected():
+    processed_events: set[str] = set()
+    claim_webhook_event("event-1", processed_events)
+    with pytest.raises(InvalidWebhook, match="already processed"):
+        claim_webhook_event("event-1", processed_events)

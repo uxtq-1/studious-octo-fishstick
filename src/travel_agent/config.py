@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,8 +30,24 @@ class Settings(BaseSettings):
     def validate_secure_environment(self) -> "Settings":
         if "*" in self.allowed_origins:
             raise ValueError("CORS wildcard origins are not allowed")
+        for origin in self.allowed_origins:
+            parsed = urlsplit(origin)
+            if (
+                parsed.scheme not in {"http", "https"}
+                or not parsed.hostname
+                or parsed.path not in {"", "/"}
+                or parsed.query
+                or parsed.fragment
+                or parsed.username
+                or parsed.password
+            ):
+                raise ValueError("CORS origins must be explicit HTTP(S) origins")
         if self.environment == "production" and self.dev_auth_enabled:
             raise ValueError("development authentication cannot be enabled in production")
+        if self.environment == "production" and any(
+            not origin.startswith("https://") for origin in self.allowed_origins
+        ):
+            raise ValueError("production CORS origins must use HTTPS")
         return self
 
 
