@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AI Travel Agent{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="site-header"><strong>Consumer Travel Marketplace</strong></header>
+  {% if simulation_mode %}<div class="simulation" role="status">Demonstration mode — no real reservations or payments are made.</div>{% endif %}
+  <main id="main-content">{% block content %}{% endblock %}</main>
+</body>
+</html>

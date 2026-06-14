@@ -1,0 +1,12 @@
+version: "2026.1"
+currency: USD
+flight_max: "1500.00"
+hotel_nightly_max: "350.00"
+ground_transport_max: "250.00"
+trip_max: "5000.00"
+approval_threshold: "2500.00"
+allowed_cabins:
+  - economy
+  - premium_economy
+  - business
+business_class_requires_approval: true

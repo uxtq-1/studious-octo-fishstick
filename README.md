@@ -1,114 +1,81 @@
-{% extends "base.html" %}
-{% block title %}Book a Trip — AI Travel Agent{% endblock %}
-{% block content %}
-<div class="card">
-  <h2>Book a Business Trip</h2>
-  <p style="font-size:0.88rem;color:#666;margin-bottom:1.2rem;">
-    The AI agent will autonomously book flights, hotel, and ground transport within company policy.
-  </p>
-  <form id="trip-form">
-    <div class="grid-2">
-      <div>
-        <label>Traveler Name</label>
-        <input type="text" name="traveler_name" placeholder="Jane Smith" required>
-      </div>
-      <div>
-        <label>Traveler Email</label>
-        <input type="email" name="traveler_email" placeholder="jane@company.com" required>
-      </div>
-    </div>
-    <div class="grid-2">
-      <div>
-        <label>Origin (IATA code)</label>
-        <input type="text" name="origin" placeholder="SFO" required maxlength="3" style="text-transform:uppercase">
-      </div>
-      <div>
-        <label>Destination (IATA code)</label>
-        <input type="text" name="destination" placeholder="JFK" required maxlength="3" style="text-transform:uppercase">
-      </div>
-    </div>
-    <div class="grid-2">
-      <div>
-        <label>Departure Date</label>
-        <input type="date" name="departure_date" required>
-      </div>
-      <div>
-        <label>Return Date (optional)</label>
-        <input type="date" name="return_date">
-      </div>
-    </div>
-    <label>Purpose of Travel</label>
-    <input type="text" name="purpose" placeholder="Client meeting, conference, training..." required>
-    <div class="grid-2" style="margin-bottom:1rem">
-      <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0">
-        <input type="checkbox" name="needs_hotel" checked style="width:auto;margin-bottom:0">
-        Include hotel booking
-      </label>
-      <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0">
-        <input type="checkbox" name="needs_ground_transport" checked style="width:auto;margin-bottom:0">
-        Include ground transport
-      </label>
-    </div>
-    <button type="submit" class="btn btn-primary">Book Trip →</button>
-  </form>
-</div>
+# Consumer Travel Marketplace
 
-<div id="result" style="display:none">
-  <div class="card">
-    <h2>Booking Status</h2>
-    <div id="status-content"></div>
-  </div>
-</div>
+A reconstructed, development-only foundation for an AI-assisted **consumer travel
+marketplace** for individuals, businesses, and groups. The product direction is
+Amadeus-backed travel discovery and booking, provider-neutral payments, and an
+optional AI concierge. The recovery phase preserves every flattened source
+artifact for later, audited migration.
 
-<script>
-const form = document.getElementById('trip-form');
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(form).entries());
-  data.needs_hotel = form.needs_hotel.checked;
-  data.needs_ground_transport = form.needs_ground_transport.checked;
-  if (!data.return_date) delete data.return_date;
+> **Demonstration limitation:** the current application does not make real reservations, process payments, authenticate users, or provide a production booking workflow. Those capabilities are intentionally deferred until persistence, authorization, audit, and payment controls are implemented.
 
-  document.getElementById('result').style.display = 'block';
-  document.getElementById('status-content').innerHTML =
-    '<div class="alert alert-info">⏳ Submitting trip request...</div>';
+## What is restored
 
-  try {
-    const res = await fetch('/api/trips', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(data),
-    });
-    const trip = await res.json();
-    if (!res.ok) throw new Error(trip.detail || 'Failed to submit trip');
+- A FastAPI application factory with lifespan-loaded deterministic travel guardrails.
+- Correct `src/` package layout, Jinja templates, static assets, and mock-merchant package.
+- Strict decimal-based evaluation for baseline price, cabin, trip-total, and review checks.
+- Operational startup, readiness, and liveness endpoints.
+- Compilation, application, policy, formatting, lint, type, and security test configuration.
+- A complete archive and migration map for the original flattened upload.
 
-    document.getElementById('status-content').innerHTML =
-      `<div class="alert alert-info">
-        ✅ Trip submitted! ID: <strong>${trip.trip_id}</strong><br>
-        The AI agent is now booking your travel...<br>
-        <a href="/trips/${trip.trip_id}">Track booking status →</a>
-      </div>`;
+## Requirements
 
-    // Poll for completion
-    pollStatus(trip.trip_id);
-  } catch (err) {
-    document.getElementById('status-content').innerHTML =
-      `<div class="alert" style="background:#fdedec;color:#c0392b;border:1px solid #f5b7b1">
-        ❌ Error: ${err.message}
-      </div>`;
-  }
-});
+- Python 3.12+
 
-async function pollStatus(tripId) {
-  for (let i = 0; i < 60; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    const res = await fetch(`/api/trips/${tripId}`);
-    const trip = await res.json();
-    if (['booked', 'escalated', 'failed'].includes(trip.status)) {
-      window.location.href = `/trips/${tripId}`;
-      return;
-    }
-  }
-}
-</script>
-{% endblock %}
+## Setup and run
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+uvicorn travel_agent.main:app --reload
+```
+
+Open <http://127.0.0.1:8000> or API documentation at <http://127.0.0.1:8000/docs>.
+
+## Tests and checks
+
+```bash
+python -m compileall src tests mock_merchants
+ruff check .
+ruff format --check .
+mypy src
+pytest --cov=travel_agent --cov-report=term-missing
+bandit -r src
+pip-audit
+```
+
+## Configuration
+
+Copy `.env.example` to `.env`. Environment variables use the `TRAVEL_AGENT_`
+prefix. The legacy-compatible travel guardrail example is in
+`config/policy.example.yaml` and uses decimal strings to avoid binary
+floating-point money calculations.
+
+## Architecture
+
+The target is a modular monolith: HTTP delivery, identity, trips, Amadeus
+adapters, provider-neutral payments, orders, notifications, support, audit, and
+optional AI planning remain explicit boundaries. Mock providers simulate
+external systems. See the [consumer product requirements](docs/consumer-product-requirements.md),
+[API contracts](docs/api-contracts.md), [MCP boundary](docs/mcp.md),
+[Terraform foundation](infra/terraform/README.md), [architecture](docs/architecture.md),
+[Firebase and Flutter integration](docs/firebase-flutter.md), and
+[reconstruction map](docs/reconstruction-map.md).
+
+## Flutter client
+
+The initial cross-platform client lives in `clients/flutter_app`. It is a safe
+shell with no embedded Firebase project identifiers or provider secrets. See
+`docs/firebase-flutter.md` before generating platform-specific Firebase options.
+
+## Mock users
+
+None in this phase. Authentication is intentionally not represented by an insecure placeholder. A clearly marked local identity provider is planned for the identity-and-approvals phase.
+
+## Security reporting
+
+Do not include secrets or personal data in reports. Open a private security advisory in the repository hosting service when available. This project makes no claim of regulatory certification; documentation describes control intentions and known gaps only.
+
+## Deployment guidance
+
+This phase is suitable for local development and CI validation only. Do not expose it as a booking service. Production deployment remains blocked on authentication, authorization, persistent state, CSRF controls, trusted-host configuration, audit storage, SSRF defenses, and reviewed payment integrations.
