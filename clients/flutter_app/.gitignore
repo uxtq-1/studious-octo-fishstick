@@ -1,0 +1,9 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+coverage/
+android/key.properties
+ios/Flutter/Generated.xcconfig
+lib/firebase_options*.dart
